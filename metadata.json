@@ -1,0 +1,5 @@
+{
+  "name": "CloudQuest To-Do",
+  "description": "A sleek, cloud-native inspired To-Do list application designed with a microservices-ready architecture, featuring authentication simulation and comprehensive task management.",
+  "requestFramePermissions": []
+}
