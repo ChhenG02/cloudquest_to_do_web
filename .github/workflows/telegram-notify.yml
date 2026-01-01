@@ -1,0 +1,54 @@
+name: Telegram Notifications
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    types: [opened, closed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare and Send Telegram Notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REPO: ${{ github.repository }}
+          REPO_URL: https://github.com/${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          USER: ${{ github.actor }}
+          USER_URL: https://github.com/${{ github.actor }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # Escape special HTML characters in commit message (if present)
+          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+          COMMIT_MESSAGE_ESCAPED=$(printf '%s' "$COMMIT_MESSAGE" | sed 's/&/\&amp;/g; s/</\</g; s/>/\>/g')
+
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.event.head_commit.id }}"
+          BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}"
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            PR_NUMBER=${{ github.event.pull_request.number }}
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_URL="https://github.com/${{ github.repository }}/pull/${PR_NUMBER}"
+            ACTION="closed (merged)" && [ "${{ github.event.pull_request.merged }}" == "true" ] && ACTION="merged" || ACTION="opened"
+            MESSAGE="🔔 <b>GitHub Pull Request ${ACTION^^}</b>%0A%0A\
+            🚀 <b>Repo:</b> <a href='${REPO_URL}'>${REPO}</a>%0A\
+            🌿 <b>Branch:</b> <a href='${BRANCH_URL}'>${BRANCH}</a>%0A\
+            👤 <b>Author:</b> <a href='${USER_URL}'>${USER}</a>%0A\
+            🔗 <b>PR #${PR_NUMBER}:</b> <a href='${PR_URL}'>${PR_TITLE}</a>"
+          else
+            MESSAGE="🚀 <b>New Push to Repository</b>%0A%0A\
+            📦 <b>Repo:</b> <a href='${REPO_URL}'>${REPO}</a>%0A\
+            🌿 <b>Branch:</b> <a href='${BRANCH_URL}'>${BRANCH}</a>%0A\
+            👤 <b>By:</b> <a href='${USER_URL}'>${USER}</a>%0A\
+            📝 <b>Commit:</b> <a href='${COMMIT_URL}'>${COMMIT_MESSAGE_ESCAPED}</a>"
+          fi
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+               -d "chat_id=${TELEGRAM_CHAT_ID}" \
+               -d "parse_mode=HTML" \
+               -d "disable_web_page_preview=true" \
+               -d "text=${MESSAGE}"
