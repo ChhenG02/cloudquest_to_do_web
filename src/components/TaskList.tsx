@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Task, TaskStatus, BoardMember } from '../types';
+
 import TaskItem from './TaskItem';
+import { BoardMember, Task, TaskStatus } from '@/types';
 
 interface TaskListProps {
   title: string;

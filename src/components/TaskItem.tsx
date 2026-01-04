@@ -1,6 +1,7 @@
 
+import { BoardMember, Task, TaskStatus } from '@/types';
 import React from 'react';
-import { Task, TaskStatus, BoardMember } from '../types';
+
 
 interface TaskItemProps {
   task: Task;

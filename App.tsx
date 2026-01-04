@@ -1,59 +1,98 @@
+// src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthStore } from './src/stores/useAuthStore';
+import LoadingSpinner from './src/components/LoadingSpinner';
+import Login from './src/pages/p1-auth/Login';
+import Register from './src/pages/p1-auth/Register';
+import Dashboard from './src/components/Dashboard';
 
-import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Dashboard from './components/Dashboard';
-import Login from './components/Login';
-import Register from './components/Register';
-import { AuthState, User } from './types';
 
-const App: React.FC = () => {
-  const [auth, setAuth] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    token: null
-  });
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
+  const [checkedAuth, setCheckedAuth] = useState(false);
 
-  // Load from local storage on mount (simulating persistence)
   useEffect(() => {
-    const savedAuth = localStorage.getItem('cloudquest_auth');
-    if (savedAuth) {
-      setAuth(JSON.parse(savedAuth));
+    if (!checkedAuth) {
+      checkAuth().finally(() => {
+        setCheckedAuth(true);
+      });
     }
-  }, []);
+  }, [checkAuth, checkedAuth]);
 
-  const handleLogin = (user: User, token: string) => {
-    const newAuth = { user, isAuthenticated: true, token };
-    setAuth(newAuth);
-    localStorage.setItem('cloudquest_auth', JSON.stringify(newAuth));
-  };
+  if (isLoading || !checkedAuth) {
+    return <LoadingSpinner />;
+  }
 
-  const handleLogout = () => {
-    setAuth({ user: null, isAuthenticated: false, token: null });
-    localStorage.removeItem('cloudquest_auth');
-  };
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
+  const [checkedAuth, setCheckedAuth] = useState(false);
+
+  useEffect(() => {
+    if (!checkedAuth) {
+      checkAuth().finally(() => {
+        setCheckedAuth(true);
+      });
+    }
+  }, [checkAuth, checkedAuth]);
+
+  if (isLoading || !checkedAuth) {
+    return <LoadingSpinner />;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+function App() {
+  const { checkAuth } = useAuthStore();
+  
+  useEffect(() => {
+    // Initial auth check
+    checkAuth();
+  }, [checkAuth]);
 
   return (
-    <HashRouter>
-      <div className="min-h-screen flex flex-col">
-        <main className="flex-grow">
-          <Routes>
-            <Route 
-              path="/login" 
-              element={!auth.isAuthenticated ? <Login onLogin={handleLogin} /> : <Navigate to="/" />} 
-            />
-            <Route 
-              path="/register" 
-              element={!auth.isAuthenticated ? <Register onLogin={handleLogin} /> : <Navigate to="/" />} 
-            />
-            <Route 
-              path="/" 
-              element={auth.isAuthenticated ? <Dashboard currentUser={auth.user!} onLogout={handleLogout} /> : <Navigate to="/login" />} 
-            />
-          </Routes>
-        </main>
-      </div>
-    </HashRouter>
+    <Router>
+      <Routes>
+        <Route 
+          path="/login" 
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            <PublicRoute>
+              <Register />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/dashboard/*" 
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Router>
   );
-};
+}
 
 export default App;
