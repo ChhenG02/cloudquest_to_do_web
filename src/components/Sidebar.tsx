@@ -1,24 +1,35 @@
-
 import React from 'react';
-import { Board, User } from '../types';
+import { useAuthStore } from '../stores/useAuthStore';
+import { Board } from '@/types';
+
 
 interface SidebarProps {
   boards: Board[];
   activeBoardId: string;
   onSelectBoard: (id: string) => void;
   onAddBoard: () => void;
-  currentUser: User;
-  onLogout: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
   boards, 
   activeBoardId, 
   onSelectBoard, 
-  onAddBoard, 
-  currentUser,
-  onLogout
+  onAddBoard
 }) => {
+  const { logout, user } = useAuthStore();
+  
+  // Get current user from store
+  const currentUser = user || {
+    id: '',
+    username: 'Guest',
+    email: '',
+    name: 'Guest'
+  };
+
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
     <div className="w-64 bg-gray-900 text-gray-300 flex flex-col h-full border-r border-gray-800">
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
@@ -55,6 +66,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className={`w-2 h-2 rounded-full ${activeBoardId === board.id ? 'bg-white' : 'bg-gray-600 group-hover:bg-blue-400'}`}></div>
                 <span className="truncate block font-medium">{board.name}</span>
               </div>
+              
+              {/* Show board type indicator */}
+              {board.type === 'group' && (
+                <span className="text-[10px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded ml-2 flex-shrink-0">
+                  Team
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -62,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="mt-auto p-4 border-t border-gray-800 bg-gray-900/50">
         <button 
-          onClick={onLogout}
+          onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-red-900/10 hover:bg-red-900/30 text-red-400 rounded-lg text-xs font-bold transition-all border border-red-500/10 hover:border-red-500/30 shadow-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

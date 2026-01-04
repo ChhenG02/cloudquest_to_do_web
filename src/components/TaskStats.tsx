@@ -1,6 +1,7 @@
 
+import { Task, TaskStatus } from '@/types';
 import React from 'react';
-import { Task, TaskStatus } from '../types';
+
 
 interface TaskStatsProps {
   tasks: Task[];

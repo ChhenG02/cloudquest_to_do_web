@@ -1,19 +1,15 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Task, TaskStatus, Board } from '../types';
 import Sidebar from './Sidebar';
 import TaskList from './TaskList';
-import TaskStats from './TaskStats';
 import TaskModal from './TaskModal';
 import MemberModal from './MemberModal';
 import ConfirmModal from './ConfirmModal';
+import { useAuthStore } from '../stores/useAuthStore';
+import { Board, Task, TaskStatus } from '@/types';
 
-interface DashboardProps {
-  currentUser: User;
-  onLogout: () => void;
-}
 
-const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
+const Dashboard: React.FC = () => {
+  const { user: currentUser, logout } = useAuthStore();
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -30,15 +26,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [confirmBoardDelete, setConfirmBoardDelete] = useState<Board | null>(null);
 
   const activeBoard = boards.find(b => b.id === activeBoardId) || boards[0];
-  const userPermission = activeBoard?.members.find(m => m.userId === currentUser.id)?.permission || 'viewer';
+  const userPermission = activeBoard?.members.find(m => m.userId === currentUser?.id)?.permission || 'viewer';
   const canModify = userPermission === 'admin' || userPermission === 'editor';
-  const isOwner = activeBoard?.ownerId === currentUser.id;
+  const isOwner = activeBoard?.ownerId === currentUser?.id;
 
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter(t => t.status === TaskStatus.DONE).length;
   const completionRate = totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
   useEffect(() => {
+    if (!currentUser) return;
+    
     const savedBoards = localStorage.getItem(`boards_${currentUser.id}`);
     const savedTasks = localStorage.getItem(`tasks_global_${currentUser.id}`);
     
@@ -50,20 +48,55 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     } else {
       const initialBoards: Board[] = [
         { 
-          id: 'b1', name: 'Product Roadmap', type: 'personal', ownerId: currentUser.id, 
-          members: [{ userId: currentUser.id, name: currentUser.name, email: currentUser.email, permission: 'admin' }] 
+          id: 'b1', 
+          name: 'Product Roadmap', 
+          type: 'personal', 
+          ownerId: currentUser.id, 
+          members: [{ 
+            userId: currentUser.id, 
+            name: currentUser.name || currentUser.username, 
+            email: currentUser.email, 
+            permission: 'admin' 
+          }] 
         },
         { 
-          id: 'b2', name: 'Frontend Refactor', type: 'group', ownerId: currentUser.id, 
+          id: 'b2', 
+          name: 'Frontend Refactor', 
+          type: 'group', 
+          ownerId: currentUser.id, 
           members: [
-            { userId: currentUser.id, name: currentUser.name, email: currentUser.email, permission: 'admin' },
-            { userId: 'u2', name: 'Sarah Chen', email: 'sarah@dev.io', permission: 'editor' }
+            { 
+              userId: currentUser.id, 
+              name: currentUser.name || currentUser.username, 
+              email: currentUser.email, 
+              permission: 'admin' 
+            },
+            { 
+              userId: 'u2', 
+              name: 'Sarah Chen', 
+              email: 'sarah@dev.io', 
+              permission: 'editor' 
+            }
           ] 
         }
       ];
       const initialTasks: Task[] = [
-        { id: '1', content: 'Design Gateway API', status: TaskStatus.TODO, userId: currentUser.id, assignedTo: [currentUser.id], createdAt: new Date().toISOString() },
-        { id: '2', content: 'Dockerize Auth Service', status: TaskStatus.IN_PROGRESS, userId: currentUser.id, assignedTo: ['u2'], createdAt: new Date().toISOString() }
+        { 
+          id: '1', 
+          content: 'Design Gateway API', 
+          status: TaskStatus.TODO, 
+          userId: currentUser.id, 
+          assignedTo: [currentUser.id], 
+          createdAt: new Date().toISOString() 
+        },
+        { 
+          id: '2', 
+          content: 'Dockerize Auth Service', 
+          status: TaskStatus.IN_PROGRESS, 
+          userId: currentUser.id, 
+          assignedTo: ['u2'], 
+          createdAt: new Date().toISOString() 
+        }
       ];
       setBoards(initialBoards);
       setTasks(initialTasks);
@@ -71,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       localStorage.setItem(`boards_${currentUser.id}`, JSON.stringify(initialBoards));
       localStorage.setItem(`tasks_global_${currentUser.id}`, JSON.stringify(initialTasks));
     }
-  }, [currentUser.id]);
+  }, [currentUser]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -84,6 +117,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   }, []);
 
   const persist = (b: Board[], t: Task[]) => {
+    if (!currentUser) return;
+    
     setBoards(b);
     setTasks(t);
     localStorage.setItem(`boards_${currentUser.id}`, JSON.stringify(b));
@@ -91,12 +126,19 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   };
 
   const handleAddBoard = () => {
+    if (!currentUser) return;
+    
     const newBoard: Board = {
       id: Math.random().toString(36).substr(2, 9),
       name: 'Untitled Board',
       type: 'personal',
       ownerId: currentUser.id,
-      members: [{ userId: currentUser.id, name: currentUser.name, email: currentUser.email, permission: 'admin' }]
+      members: [{ 
+        userId: currentUser.id, 
+        name: currentUser.name || currentUser.username, 
+        email: currentUser.email, 
+        permission: 'admin' 
+      }]
     };
     persist([...boards, newBoard], tasks);
     setActiveBoardId(newBoard.id);
@@ -123,7 +165,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskContent.trim() || !canModify) return;
+    if (!newTaskContent.trim() || !canModify || !currentUser) return;
+    
     const newTask: Task = {
       id: Math.random().toString(36).substr(2, 9),
       content: newTaskContent,
@@ -153,6 +196,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     setShowBoardMenu(false);
   };
 
+  // If no user, redirect (App.tsx will handle this)
+  if (!currentUser) {
+    return null;
+  }
+
   return (
     <div className="h-screen flex bg-[#f8fafc] overflow-hidden relative">
       <Sidebar 
@@ -160,8 +208,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         activeBoardId={activeBoardId} 
         onSelectBoard={setActiveBoardId} 
         onAddBoard={handleAddBoard}
-        currentUser={currentUser}
-        onLogout={onLogout}
       />
 
       <main className="flex-grow flex flex-col min-w-0">
@@ -196,27 +242,27 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Board Settings</p>
                   </div>
                   {isOwner && (
-                    <button 
-                      onClick={startRename}
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-                    >
-                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                      Rename Board
-                    </button>
-                  )}
-                  {isOwner && (
-                    <button 
-                      onClick={() => { setShowMemberModal(true); setShowBoardMenu(false); }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-                    >
-                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                      Manage Access
-                    </button>
+                    <>
+                      <button 
+                        onClick={startRename}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        Rename Board
+                      </button>
+                      <button 
+                        onClick={() => { setShowMemberModal(true); setShowBoardMenu(false); }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        Manage Access
+                      </button>
+                    </>
                   )}
                   <div className="border-t my-1"></div>
                   {isOwner && (
                     <button 
-                      onClick={() => { setConfirmBoardDelete(activeBoard); setShowBoardMenu(false); }}
+                      onClick={() => { setConfirmBoardDelete(activeBoard!); setShowBoardMenu(false); }}
                       className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 font-medium"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -228,37 +274,50 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
             </div>
             
             <div className="flex -space-x-1.5 ml-2">
-               {activeBoard?.members.map(m => (
-                 <div key={m.userId} className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700 hover:z-10 cursor-help transition-all" title={`${m.name} (${m.permission})`}>
-                   {m.name[0]}
-                 </div>
-               ))}
+              {activeBoard?.members.map(m => (
+                <div 
+                  key={m.userId} 
+                  className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700 hover:z-10 cursor-help transition-all" 
+                  title={`${m.name} (${m.permission})`}
+                >
+                  {m.name[0]}
+                </div>
+              ))}
             </div>
           </div>
           
           <div className="flex items-center gap-4">
-             <div className="text-right">
-               <div className="text-sm font-bold text-gray-900 leading-tight">{currentUser.name}</div>
-               <div className="text-[10px] text-gray-400 font-medium truncate max-w-[150px]">{currentUser.email}</div>
-             </div>
-             <div className="w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-sm font-bold text-white shadow-md">
-                {currentUser.name[0].toUpperCase()}
-             </div>
+            <div className="text-right">
+              <div className="text-sm font-bold text-gray-900 leading-tight">
+                {currentUser.name || currentUser.username}
+              </div>
+              <div className="text-[10px] text-gray-400 font-medium truncate max-w-[150px]">
+                {currentUser.email}
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-sm font-bold text-white shadow-md">
+              {(currentUser.name || currentUser.username)[0].toUpperCase()}
+            </div>
           </div>
         </header>
 
         {canModify && (
           <div className="px-6 py-3 border-b bg-white/50">
-             <form onSubmit={handleAddTask} className="flex max-w-lg gap-2">
-                <input
-                  type="text"
-                  placeholder="Draft a new task..."
-                  value={newTaskContent}
-                  onChange={(e) => setNewTaskContent(e.target.value)}
-                  className="flex-grow text-xs px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all shadow-sm"
-                />
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">Add Task</button>
-             </form>
+            <form onSubmit={handleAddTask} className="flex max-w-lg gap-2">
+              <input
+                type="text"
+                placeholder="Draft a new task..."
+                value={newTaskContent}
+                onChange={(e) => setNewTaskContent(e.target.value)}
+                className="flex-grow text-xs px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all shadow-sm"
+              />
+              <button 
+                type="submit" 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+              >
+                Add Task
+              </button>
+            </form>
           </div>
         )}
 
@@ -335,8 +394,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           board={activeBoard} 
           onClose={() => setShowMemberModal(false)} 
           onUpdateBoard={(updates) => {
-             const updated = boards.map(b => b.id === activeBoardId ? { ...b, ...updates } : b);
-             persist(updated, tasks);
+            const updated = boards.map(b => b.id === activeBoardId ? { ...b, ...updates } : b);
+            persist(updated, tasks);
           }} 
           currentUserId={currentUser.id}
         />

@@ -1,6 +1,7 @@
 
+import { Board, BoardMember, Permission } from '@/types';
 import React, { useState } from 'react';
-import { Board, BoardMember, Permission } from '../types';
+
 
 interface MemberModalProps {
   board: Board;

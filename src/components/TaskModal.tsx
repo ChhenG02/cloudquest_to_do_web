@@ -1,6 +1,7 @@
 
+import { BoardMember, Task } from '@/types';
 import React, { useState } from 'react';
-import { Task, User, BoardMember } from '../types';
+
 
 interface TaskModalProps {
   task: Task;
