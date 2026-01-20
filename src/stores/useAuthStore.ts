@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axiosInstance from "../lib/axios";
 import toast from "react-hot-toast";
+import { useTaskStore } from "./useTaskStore";
+import { useBoardStore } from "./useBoardStore";
 
 interface User {
   id: string;
@@ -20,7 +22,7 @@ interface AuthState {
   register: (
     username: string,
     email: string,
-    password: string
+    password: string,
   ) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
@@ -42,7 +44,6 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
 
         try {
-
           const response = await axiosInstance.post("auth/login", {
             email,
             password,
@@ -71,7 +72,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           console.error(
             "Login error details:",
-            error.response?.data || error.message
+            error.response?.data || error.message,
           );
 
           const errorMessage = error.response?.data?.message || "Login failed";
@@ -85,7 +86,6 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
 
         try {
-
           const response = await axiosInstance.post("auth/signup", {
             username,
             email,
@@ -115,7 +115,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           console.error(
             "Registration error:",
-            error.response?.data || error.message
+            error.response?.data || error.message,
           );
 
           const errorMessage =
@@ -131,12 +131,12 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem("user");
         localStorage.removeItem("auth-storage");
 
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-        });
+        useBoardStore.getState().reset();
+        useTaskStore.getState().reset();
 
+        useBoardStore.persist.clearStorage();
+
+        set({ user: null, token: null, isAuthenticated: false });
         toast.success("Logged out successfully");
         window.location.href = "/login";
       },
@@ -201,11 +201,10 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
-
         } catch (error: any) {
           console.error(
             "Checkauth error:",
-            error.response?.data || error.message
+            error.response?.data || error.message,
           );
 
           // Token is invalid or expired
@@ -249,6 +248,6 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
-    }
-  )
+    },
+  ),
 );
