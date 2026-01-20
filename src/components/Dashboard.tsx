@@ -36,8 +36,10 @@ const Dashboard: React.FC = () => {
     tasks,
     fetchTasksByBoard,
 
+    updateTaskStatus,
+    reorderColumn,
+
     // keep same "updateTask" behavior but local for now:
-    updateTaskStatusLocal,
 
     // OPTIONAL: if you already added addTask/deleteTask/updateTaskContent in store later,
     // you can wire them here. For now we keep local-only like your current backend has only GET.
@@ -64,11 +66,14 @@ const Dashboard: React.FC = () => {
   const activeBoard = getActiveBoard();
   const members: BoardMember[] = activeBoard?.members || [];
 
-  // Permissions (same logic as old)
-  const userPermission =
-    members.find((m) => m.userId === currentUser?.id)?.permission || "viewer";
-  const canModify = userPermission === "admin" || userPermission === "editor";
-  const isOwner = activeBoard?.ownerId === currentUser?.id;
+  const isOwnerById = activeBoard?.ownerId === currentUser?.id;
+
+  const userRole =
+    members.find((m) => m.userId === currentUser?.id)?.role ??
+    (isOwnerById ? "OWNER" : "VIEWER");
+
+  const canModify = userRole === "OWNER" || userRole === "EDITOR";
+  const isOwner = userRole === "OWNER";
 
   // Completion (same as old)
   const totalTasks = tasks.length;
@@ -79,16 +84,24 @@ const Dashboard: React.FC = () => {
   const completionRate =
     totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
+  const reorderAfterMove = async (status: TaskStatus) => {
+    if (!activeBoardId) return;
+
+    const ids = tasks.filter((t) => t.status === status).map((t) => t.id);
+
+    await reorderColumn(activeBoardId, status, ids);
+  };
+
   // 1) Fetch boards once logged in
- useEffect(() => {
-  if (!currentUser?.id) return;
+  useEffect(() => {
+    if (!currentUser?.id) return;
 
-  // clear old account UI immediately, then refetch
-  useBoardStore.getState().reset();
-  useTaskStore.getState().reset();
+    // clear old account UI immediately, then refetch
+    useBoardStore.getState().reset();
+    useTaskStore.getState().reset();
 
-  fetchBoards();
-}, [currentUser?.id]);
+    fetchBoards();
+  }, [currentUser?.id]);
 
   // 2) Fetch tasks for active board
   useEffect(() => {
@@ -146,39 +159,29 @@ const Dashboard: React.FC = () => {
     setShowBoardMenu(false);
   };
 
-  // NOTE: Your backend currently showed only GET boards + GET tasks by board.
-  // So "Add Task" cannot truly save to backend unless you have POST endpoint.
-  // We keep same UX but do local add only (until you provide POST endpoint).
-  const handleAddTask = (e: React.FormEvent) => {
+  const { createTask } = useTaskStore();
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskContent.trim() || !canModify) return;
+    if (!activeBoardId) {
+      toast.error("Please select a board first");
+      return;
+    }
 
-    // Local-only add (temporary)
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      content: newTaskContent.trim(),
-      status: STATUS.TODO,
-      assignedTo: [],
-      userId: currentUser?.id,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Put into UI list immediately (local)
-    // You need setTasks in store for this. If you don't have it, add it.
-    useTaskStore.getState().setTasks([newTask, ...tasks]);
-
-    setNewTaskContent("");
-    toast.success("Task added (local)");
+    try {
+      await createTask(activeBoardId, newTaskContent);
+      setNewTaskContent("");
+    } catch {}
   };
 
   // Keep same updateTask behavior (for modal update)
-  const updateTask = (id: string, updates: Partial<Task>) => {
-    // only status update supported in store helper:
+  const updateTask = async (id: string, updates: Partial<Task>) => {
+    // ✅ status: call backend
     if (updates.status) {
-      updateTaskStatusLocal(id, updates.status);
+      await updateTaskStatus(id, updates.status);
     }
 
-    // if you want to support content/description/deadline edits locally:
+    // ✅ other fields still local (until you create backend endpoints)
     if (
       updates.content ||
       updates.description ||
@@ -360,7 +363,7 @@ const Dashboard: React.FC = () => {
                 <div
                   key={m.userId}
                   className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700 hover:z-10 cursor-help transition-all"
-                  title={`${m.name} (${m.permission})`}
+                  title={`${m.name} (${m.role})`}
                 >
                   {m.name[0]}
                 </div>
@@ -411,7 +414,10 @@ const Dashboard: React.FC = () => {
             <TaskList
               title="To Do"
               tasks={tasks.filter((t) => t.status === STATUS.TODO)}
-              onUpdateStatus={(id, status) => updateTask(id, { status })}
+              onUpdateStatus={async (id, status) => {
+                await updateTaskStatus(id, status);
+                await reorderAfterMove(status);
+              }}
               onDelete={(id) => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
@@ -425,7 +431,10 @@ const Dashboard: React.FC = () => {
             <TaskList
               title="In Progress"
               tasks={tasks.filter((t) => t.status === STATUS.IN_PROGRESS)}
-              onUpdateStatus={(id, status) => updateTask(id, { status })}
+              onUpdateStatus={async (id, status) => {
+                await updateTaskStatus(id, status);
+                await reorderAfterMove(status);
+              }}
               onDelete={(id) => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
@@ -439,7 +448,10 @@ const Dashboard: React.FC = () => {
             <TaskList
               title="Done"
               tasks={tasks.filter((t) => t.status === STATUS.DONE)}
-              onUpdateStatus={(id, status) => updateTask(id, { status })}
+              onUpdateStatus={async (id, status) => {
+                await updateTaskStatus(id, status);
+                await reorderAfterMove(status);
+              }}
               onDelete={(id) => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
@@ -471,12 +483,6 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Loading / error hint (optional) */}
-      {tasksLoading && (
-        <div className="fixed bottom-6 left-6 text-xs text-gray-400">
-          Loading tasks...
-        </div>
-      )}
       {tasksError && (
         <div className="fixed bottom-6 left-6 text-xs text-red-500">
           {tasksError}
