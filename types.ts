@@ -45,8 +45,9 @@ export interface BoardMember {
   userId: string;
   name: string;
   email: string;
-  permission: 'admin' | 'editor' | 'viewer';
+  role: BoardRole;
 }
 
+export type BoardRole = "OWNER" | "EDITOR" | "VIEWER";
 
-export type Permission = 'admin' | 'editor' | 'viewer';
+// export type Permission = 'admin' | 'editor' | 'viewer';

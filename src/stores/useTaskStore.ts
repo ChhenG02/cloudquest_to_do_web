@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import axiosInstance from "../lib/axios";
 import toast from "react-hot-toast";
-import { TaskStatus } from "@/types";
-
+import type { TaskStatus } from "@/types";
 
 export interface Task {
   id: string;
@@ -13,6 +12,8 @@ export interface Task {
   assignedTo: string[];
   description?: string;
   deadline?: string;
+  userId?: string;
+  createdAt?: string;
 }
 
 interface ApiTask {
@@ -30,9 +31,19 @@ interface TaskState {
   error: string | null;
 
   fetchTasksByBoard: (boardId: string) => Promise<void>;
+  updateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>;
+  reorderColumn: (
+    boardId: string,
+    status: TaskStatus,
+    orderedTaskIds: string[],
+  ) => Promise<void>;
 
-  // local-only helpers for your current UI
+  // ✅ NEW: create task on backend
+  createTask: (boardId: string, name: string) => Promise<Task>;
+
+  // local helpers
   setTasks: (tasks: Task[]) => void;
+  addTaskLocal: (task: Task) => void;
   updateTaskStatusLocal: (taskId: string, status: TaskStatus) => void;
 
   clearError: () => void;
@@ -61,27 +72,91 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       return;
     }
 
-    // optional: avoid refetch if same board id and already have tasks
-    // if (get().boardId === boardId && get().tasks.length > 0) return;
-
     set({ isLoading: true, error: null, boardId });
 
     try {
       const response = await axiosInstance.get(`tasks/board/${boardId}`);
       const apiTasks: ApiTask[] = response.data || [];
-
       const tasks = apiTasks.map(mapApiTaskToUiTask);
 
-      set({
-        tasks,
-        isLoading: false,
+      set({ tasks, isLoading: false });
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message || "Failed to fetch tasks";
+      set({ error: errorMessage, isLoading: false });
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  // ✅ NEW: create on backend then update state
+  createTask: async (boardId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Task name is required");
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const res = await axiosInstance.post("tasks", {
+        boardId,
+        name: trimmed,
+      });
+
+      // Expect: { id, boardId, name, status } OR same fields
+      const apiTask: ApiTask = res.data;
+
+      const uiTask = mapApiTaskToUiTask(apiTask);
+
+      // Put new task on top
+      set({ tasks: [uiTask, ...get().tasks], isLoading: false });
+
+      toast.success("Task created");
+      return uiTask;
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message || "Failed to create task";
+      set({ error: errorMessage, isLoading: false });
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  updateTaskStatus: async (taskId: string, status: TaskStatus) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      await axiosInstance.patch(`tasks/${taskId}/status`, { status });
+
+      // optimistic update in UI
+      const next = get().tasks.map((t) =>
+        t.id === taskId ? { ...t, status } : t,
+      );
+      set({ tasks: next, isLoading: false });
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update status";
+      set({ error: errorMessage, isLoading: false });
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  reorderColumn: async (
+    boardId: string,
+    status: TaskStatus,
+    orderedTaskIds: string[],
+  ) => {
+    if (!boardId || !orderedTaskIds?.length) return;
+
+    try {
+      await axiosInstance.patch(`tasks/board/${boardId}/reorder`, {
+        status,
+        orderedTaskIds,
       });
     } catch (error: any) {
-      console.error("Fetch tasks error:", error.response?.data || error.message);
-
-      const errorMessage = error.response?.data?.message || "Failed to fetch tasks";
-      set({ error: errorMessage, isLoading: false });
-
+      // don't block UI if reorder fails, but show message
+      const errorMessage =
+        error?.response?.data?.message || "Failed to save order";
       toast.error(errorMessage);
       throw error;
     }
@@ -89,8 +164,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   setTasks: (tasks: Task[]) => set({ tasks }),
 
+  addTaskLocal: (task: Task) => set({ tasks: [task, ...get().tasks] }),
+
   updateTaskStatusLocal: (taskId: string, status: TaskStatus) => {
-    const updated = get().tasks.map((t) => (t.id === taskId ? { ...t, status } : t));
+    const updated = get().tasks.map((t) =>
+      t.id === taskId ? { ...t, status } : t,
+    );
     set({ tasks: updated });
   },
 

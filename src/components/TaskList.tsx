@@ -28,15 +28,16 @@ const TaskList: React.FC<TaskListProps> = ({ title, tasks, onUpdateStatus, onDel
     setIsOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    if (!canModify) return;
-    e.preventDefault();
-    setIsOver(false);
-    const taskId = e.dataTransfer.getData('taskId');
-    if (taskId) {
-      onUpdateStatus(taskId, targetStatus);
-    }
-  };
+const handleDrop = async (e: React.DragEvent) => {
+  if (!canModify) return;
+  e.preventDefault();
+  setIsOver(false);
+
+  const taskId = e.dataTransfer.getData("taskId");
+  if (!taskId) return;
+
+  await onUpdateStatus(taskId, targetStatus);
+};
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     e.dataTransfer.setData('taskId', taskId);
