@@ -56,6 +56,25 @@ const Dashboard: React.FC = () => {
   const [renameValue, setRenameValue] = useState("");
   const [newTaskContent, setNewTaskContent] = useState("");
 
+  const handleReorderSameColumn = async (
+    status: TaskStatus,
+    orderedIds: string[],
+  ) => {
+    if (!activeBoardId) return;
+
+    // ✅ update local UI first
+    const idToTask = new Map(tasks.map((t) => [t.id, t]));
+    const reordered = orderedIds
+      .map((id) => idToTask.get(id))
+      .filter(Boolean) as Task[];
+
+    const others = tasks.filter((t) => t.status !== status);
+    useTaskStore.getState().setTasks([...others, ...reordered]);
+
+    // ✅ persist to backend
+    await reorderColumn(activeBoardId, status, orderedIds);
+  };
+
   const [confirmTaskDelete, setConfirmTaskDelete] = useState<Task | null>(null);
   const [confirmBoardDelete, setConfirmBoardDelete] = useState<Board | null>(
     null,
@@ -83,14 +102,6 @@ const Dashboard: React.FC = () => {
   );
   const completionRate =
     totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
-
-  const reorderAfterMove = async (status: TaskStatus) => {
-    if (!activeBoardId) return;
-
-    const ids = tasks.filter((t) => t.status === status).map((t) => t.id);
-
-    await reorderColumn(activeBoardId, status, ids);
-  };
 
   // 1) Fetch boards once logged in
   useEffect(() => {
@@ -416,8 +427,9 @@ const Dashboard: React.FC = () => {
               tasks={tasks.filter((t) => t.status === STATUS.TODO)}
               onUpdateStatus={async (id, status) => {
                 await updateTaskStatus(id, status);
-                await reorderAfterMove(status);
+                if (activeBoardId) await fetchTasksByBoard(activeBoardId);
               }}
+              onReorderSameColumn={handleReorderSameColumn}
               onDelete={(id) => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
@@ -433,7 +445,7 @@ const Dashboard: React.FC = () => {
               tasks={tasks.filter((t) => t.status === STATUS.IN_PROGRESS)}
               onUpdateStatus={async (id, status) => {
                 await updateTaskStatus(id, status);
-                await reorderAfterMove(status);
+                if (activeBoardId) await fetchTasksByBoard(activeBoardId);
               }}
               onDelete={(id) => {
                 const t = tasks.find((task) => task.id === id);
@@ -450,7 +462,7 @@ const Dashboard: React.FC = () => {
               tasks={tasks.filter((t) => t.status === STATUS.DONE)}
               onUpdateStatus={async (id, status) => {
                 await updateTaskStatus(id, status);
-                await reorderAfterMove(status);
+                if (activeBoardId) await fetchTasksByBoard(activeBoardId);
               }}
               onDelete={(id) => {
                 const t = tasks.find((task) => task.id === id);

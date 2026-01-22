@@ -20,17 +20,26 @@ const TaskItem: React.FC<TaskItemProps> = ({
   members,
   canModify,
 }) => {
-  const assignedMembers = members.filter((m) => task.assignedTo.includes(m.userId));
+  const assignedMembers = members.filter((m) =>
+    task.assignedTo.includes(m.userId),
+  );
+
   const isOverdue =
-    task.deadline &&
-    new Date(task.deadline) < new Date() &&
-    task.status !== DONE;
+    task.deadline && new Date(task.deadline) < new Date() && task.status !== DONE;
 
   return (
     <div
       draggable={canModify}
-      onDragStart={(e) => canModify && onDragStart(e, task.id)}
       onClick={() => onClick(task)}
+      onDragStart={(e) => {
+        if (!canModify) return;
+
+        e.dataTransfer.setData("taskId", task.id);
+        e.dataTransfer.setData("fromStatus", task.status); // ✅ keep
+        e.dataTransfer.effectAllowed = "move";
+
+        onDragStart(e, task.id);
+      }}
       className={`bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all group relative ${
         canModify ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       }`}
@@ -49,8 +58,19 @@ const TaskItem: React.FC<TaskItemProps> = ({
             className="absolute top-2 right-2 p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             title="Delete task"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}
@@ -64,16 +84,39 @@ const TaskItem: React.FC<TaskItemProps> = ({
                 isOverdue ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500"
               }`}
             >
-              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-2.5 h-2.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
-              {new Date(task.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              {new Date(task.deadline).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })}
             </div>
           )}
 
           {task.description && (
-            <svg className="w-3 h-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+            <svg
+              className="w-3 h-3 text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h7"
+              />
             </svg>
           )}
         </div>

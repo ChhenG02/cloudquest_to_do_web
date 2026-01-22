@@ -33,6 +33,8 @@ interface BoardState {
   reset: () => void;
 }
 
+const ACTIVE_BOARD_KEY = "activeBoardId";
+
 export const useBoardStore = create<BoardState>()(
   persist(
     (set, get) => ({
@@ -51,7 +53,9 @@ export const useBoardStore = create<BoardState>()(
 
           const currentActive = get().activeBoardId;
           const nextActive =
-            (currentActive && boards.some((b) => b.id === currentActive) && currentActive) ||
+            (currentActive &&
+              boards.some((b) => b.id === currentActive) &&
+              currentActive) ||
             boards[0]?.id ||
             null;
 
@@ -65,7 +69,10 @@ export const useBoardStore = create<BoardState>()(
         }
       },
 
-      setActiveBoardId: (boardId) => set({ activeBoardId: boardId }),
+      setActiveBoardId: (id: string) => {
+        localStorage.setItem(ACTIVE_BOARD_KEY, id);
+        set({ activeBoardId: id });
+      },
 
       getActiveBoard: () => {
         const { boards, activeBoardId } = get();
@@ -82,7 +89,7 @@ export const useBoardStore = create<BoardState>()(
           await axiosInstance.put(`boards/${boardId}`, { name });
 
           const updatedBoards = get().boards.map((b) =>
-            b.id === boardId ? { ...b, name } : b
+            b.id === boardId ? { ...b, name } : b,
           );
 
           set({ boards: updatedBoards, isLoading: false });
@@ -139,6 +146,6 @@ export const useBoardStore = create<BoardState>()(
         boards: state.boards,
         activeBoardId: state.activeBoardId,
       }),
-    }
-  )
+    },
+  ),
 );
