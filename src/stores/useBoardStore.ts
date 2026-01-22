@@ -1,5 +1,3 @@
-// useBoardStore.ts (FULL MODIFIED - fetch + active board + rename + delete like Dashboard menu)
-
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axiosInstance from "../lib/axios";
@@ -17,7 +15,12 @@ interface BoardState {
   boards: Board[];
   activeBoardId: string | null;
 
-  isLoading: boolean;
+  // separate loading flags
+  isFetchingBoards: boolean;
+  isCreatingBoard: boolean;
+  isRenamingBoard: boolean;
+  isDeletingBoard: boolean;
+
   error: string | null;
 
   createBoard: (name: string) => Promise<Board>;
@@ -26,7 +29,6 @@ interface BoardState {
 
   getActiveBoard: () => Board | undefined;
 
-  // ✅ for dropdown actions
   renameBoard: (boardId: string, name: string) => Promise<void>;
   deleteBoard: (boardId: string) => Promise<void>;
 
@@ -42,22 +44,25 @@ export const useBoardStore = create<BoardState>()(
       boards: [],
       activeBoardId: null,
 
-      isLoading: false,
+      isFetchingBoards: false,
+      isCreatingBoard: false,
+      isRenamingBoard: false,
+      isDeletingBoard: false,
+
       error: null,
 
+      // ✅ Create board
       createBoard: async (name: string) => {
-        set({ isLoading: true, error: null });
+        set({ isCreatingBoard: true, error: null });
 
         try {
           const res = await axiosInstance.post("boards", { name });
           const created: Board = res.data;
 
-  
           set({
-            boards: [...get().boards, created],
-
+            boards: [...get().boards, created], // bottom (match backend)
             activeBoardId: created.id,
-            isLoading: false,
+            isCreatingBoard: false,
           });
 
           localStorage.setItem(ACTIVE_BOARD_KEY, created.id);
@@ -66,42 +71,55 @@ export const useBoardStore = create<BoardState>()(
         } catch (error: any) {
           const errorMessage =
             error?.response?.data?.message || "Failed to create board";
-          set({ error: errorMessage, isLoading: false });
+
+          set({ error: errorMessage, isCreatingBoard: false });
           toast.error(errorMessage);
           throw error;
         }
       },
 
+      // ✅ Fetch boards
       fetchBoards: async () => {
-        set({ isLoading: true, error: null });
+        set({ isFetchingBoards: true, error: null });
 
         try {
-          const response = await axiosInstance.get("boards");
-          const boards: Board[] = response.data || [];
+          const res = await axiosInstance.get("boards");
+          const boards: Board[] = res.data || [];
 
+          const savedActive = localStorage.getItem(ACTIVE_BOARD_KEY);
+
+          // choose active: savedActive -> currentActive -> first
           const currentActive = get().activeBoardId;
           const nextActive =
-            (currentActive &&
-              boards.some((b) => b.id === currentActive) &&
-              currentActive) ||
+            (savedActive && boards.some((b) => b.id === savedActive) && savedActive) ||
+            (currentActive && boards.some((b) => b.id === currentActive) && currentActive) ||
             boards[0]?.id ||
             null;
 
-          set({ boards, activeBoardId: nextActive, isLoading: false });
+          set({
+            boards,
+            activeBoardId: nextActive,
+            isFetchingBoards: false,
+          });
+
+          if (nextActive) localStorage.setItem(ACTIVE_BOARD_KEY, nextActive);
         } catch (error: any) {
           const errorMessage =
             error?.response?.data?.message || "Failed to fetch boards";
-          set({ error: errorMessage, isLoading: false });
+
+          set({ error: errorMessage, isFetchingBoards: false });
           toast.error(errorMessage);
           throw error;
         }
       },
 
+      // ✅ Set active board
       setActiveBoardId: (id: string) => {
         localStorage.setItem(ACTIVE_BOARD_KEY, id);
         set({ activeBoardId: id });
       },
 
+      // ✅ Active board helper
       getActiveBoard: () => {
         const { boards, activeBoardId } = get();
         if (!boards.length) return undefined;
@@ -109,50 +127,58 @@ export const useBoardStore = create<BoardState>()(
       },
 
       // ✅ Rename board
-      // NOTE: endpoint assumed: PUT /boards/:id with { name }
       renameBoard: async (boardId: string, name: string) => {
-        set({ isLoading: true, error: null });
+        set({ isRenamingBoard: true, error: null });
 
         try {
           await axiosInstance.patch(`boards/${boardId}`, { name });
 
           const updatedBoards = get().boards.map((b) =>
-            b.id === boardId ? { ...b, name } : b,
+            b.id === boardId ? { ...b, name } : b
           );
 
-          set({ boards: updatedBoards, isLoading: false });
+          set({ boards: updatedBoards, isRenamingBoard: false });
           toast.success("Board renamed");
         } catch (error: any) {
           const errorMessage =
             error?.response?.data?.message || "Failed to rename board";
-          set({ error: errorMessage, isLoading: false });
+
+          set({ error: errorMessage, isRenamingBoard: false });
           toast.error(errorMessage);
           throw error;
         }
       },
 
       // ✅ Delete board
-      // NOTE: endpoint assumed: DELETE /boards/:id
       deleteBoard: async (boardId: string) => {
-        set({ isLoading: true, error: null });
+        set({ isDeletingBoard: true, error: null });
 
         try {
           await axiosInstance.delete(`boards/${boardId}`);
 
           const nextBoards = get().boards.filter((b) => b.id !== boardId);
-          const nextActive = nextBoards[0]?.id || null;
+
+          // pick next active safely
+          const nextActive =
+            (get().activeBoardId === boardId ? nextBoards[0]?.id : get().activeBoardId) ||
+            nextBoards[0]?.id ||
+            null;
 
           set({
             boards: nextBoards,
             activeBoardId: nextActive,
-            isLoading: false,
+            isDeletingBoard: false,
           });
+
+          if (nextActive) localStorage.setItem(ACTIVE_BOARD_KEY, nextActive);
+          else localStorage.removeItem(ACTIVE_BOARD_KEY);
 
           toast.success("Board deleted");
         } catch (error: any) {
           const errorMessage =
             error?.response?.data?.message || "Failed to delete board";
-          set({ error: errorMessage, isLoading: false });
+
+          set({ error: errorMessage, isDeletingBoard: false });
           toast.error(errorMessage);
           throw error;
         }
@@ -164,7 +190,10 @@ export const useBoardStore = create<BoardState>()(
         set({
           boards: [],
           activeBoardId: null,
-          isLoading: false,
+          isFetchingBoards: false,
+          isCreatingBoard: false,
+          isRenamingBoard: false,
+          isDeletingBoard: false,
           error: null,
         }),
     }),
@@ -174,6 +203,6 @@ export const useBoardStore = create<BoardState>()(
         boards: state.boards,
         activeBoardId: state.activeBoardId,
       }),
-    },
-  ),
+    }
+  )
 );

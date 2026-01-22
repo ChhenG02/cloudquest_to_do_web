@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
     totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) return; 
     if (!boardId) return;
 
     setActiveBoardId(boardId);
@@ -116,6 +116,7 @@ const Dashboard: React.FC = () => {
   // 1) Fetch boards once logged in
   useEffect(() => {
     if (!currentUser?.id) return;
+    fetchBoards();   
     if (boardId) return;
     if (!boards.length) return;
 
