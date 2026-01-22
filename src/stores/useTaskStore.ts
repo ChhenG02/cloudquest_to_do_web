@@ -5,47 +5,47 @@ import type { TaskStatus } from "@/types";
 
 export interface Task {
   id: string;
-  content: string; // UI field
+  name: string;
   status: TaskStatus;
-
-  // optional UI fields
   assignedTo: string[];
   description?: string;
   deadline?: string;
   userId?: string;
-  createdAt?: string;
+  updatedAt?: string;
+  boardId?: string;
 }
 
 interface ApiTask {
   id: string;
   boardId: string;
-  name: string; // API field
+  name: string;
+  description?: string;
+  deadline?: string;
   status: TaskStatus;
+  updatedAt?: string;
+  assignedTo?: string[];
 }
 
 interface TaskState {
   tasks: Task[];
   boardId: string | null;
-
   isLoading: boolean;
   error: string | null;
 
   fetchTasksByBoard: (boardId: string) => Promise<void>;
+  createTask: (boardId: string, name: string) => Promise<Task>;
+  updateTask: (taskId: string, updates: Partial<Task>) => Promise<Task>;
   updateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
   reorderColumn: (
     boardId: string,
     status: TaskStatus,
     orderedTaskIds: string[],
   ) => Promise<void>;
 
-  // ✅ NEW: create task on backend
-  createTask: (boardId: string, name: string) => Promise<Task>;
-
-  // local helpers
   setTasks: (tasks: Task[]) => void;
   addTaskLocal: (task: Task) => void;
   updateTaskStatusLocal: (taskId: string, status: TaskStatus) => void;
-
   clearError: () => void;
   reset: () => void;
 }
@@ -53,16 +53,19 @@ interface TaskState {
 function mapApiTaskToUiTask(t: ApiTask): Task {
   return {
     id: t.id,
-    content: t.name, // IMPORTANT: map name -> content
+    name: t.name,
     status: t.status,
-    assignedTo: [],
+    assignedTo: t.assignedTo || [],
+    description: t.description,
+    deadline: t.deadline,
+    boardId: t.boardId,
+    updatedAt: t.updatedAt,
   };
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   boardId: null,
-
   isLoading: false,
   error: null,
 
@@ -89,7 +92,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
-  // ✅ NEW: create on backend then update state
   createTask: async (boardId: string, name: string) => {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("Task name is required");
@@ -102,14 +104,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         name: trimmed,
       });
 
-      // Expect: { id, boardId, name, status } OR same fields
       const apiTask: ApiTask = res.data;
-
       const uiTask = mapApiTaskToUiTask(apiTask);
 
-      // Put new task on top
       set({ tasks: [uiTask, ...get().tasks], isLoading: false });
-
       toast.success("Task created");
       return uiTask;
     } catch (error: any) {
@@ -121,13 +119,48 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
+  updateTask: async (taskId: string, updates: Partial<Task>) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      // Prepare payload for API
+      const payload: any = {};
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.description !== undefined)
+        payload.description = updates.description;
+      if (updates.deadline !== undefined) payload.deadline = updates.deadline;
+      if (updates.assignedTo !== undefined)
+        payload.assignedTo = updates.assignedTo;
+
+      console.log("Sending update payload:", payload);
+
+      const res = await axiosInstance.patch(`tasks/${taskId}`, payload);
+      const updatedApiTask: ApiTask = res.data;
+      const updatedUiTask = mapApiTaskToUiTask(updatedApiTask);
+
+      // Update local state
+      const next = get().tasks.map((t) =>
+        t.id === taskId ? { ...t, ...updatedUiTask } : t,
+      );
+
+      set({ tasks: next, isLoading: false });
+      toast.success("Task updated");
+      return updatedUiTask;
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update task";
+      set({ error: errorMessage, isLoading: false });
+      toast.error(errorMessage);
+      throw error; // Important: re-throw the error
+    }
+  },
+
   updateTaskStatus: async (taskId: string, status: TaskStatus) => {
     set({ isLoading: true, error: null });
 
     try {
       await axiosInstance.patch(`tasks/${taskId}/status`, { status });
 
-      // optimistic update in UI
       const next = get().tasks.map((t) =>
         t.id === taskId ? { ...t, status } : t,
       );
@@ -135,6 +168,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     } catch (error: any) {
       const errorMessage =
         error?.response?.data?.message || "Failed to update status";
+      set({ error: errorMessage, isLoading: false });
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  deleteTask: async (taskId: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      await axiosInstance.delete(`tasks/${taskId}`);
+
+      const next = get().tasks.filter((t) => t.id !== taskId);
+      set({ tasks: next, isLoading: false });
+      toast.success("Task deleted");
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message || "Failed to delete task";
       set({ error: errorMessage, isLoading: false });
       toast.error(errorMessage);
       throw error;
@@ -154,7 +205,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         orderedTaskIds,
       });
     } catch (error: any) {
-      // don't block UI if reorder fails, but show message
       const errorMessage =
         error?.response?.data?.message || "Failed to save order";
       toast.error(errorMessage);
@@ -163,18 +213,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   setTasks: (tasks: Task[]) => set({ tasks }),
-
   addTaskLocal: (task: Task) => set({ tasks: [task, ...get().tasks] }),
-
   updateTaskStatusLocal: (taskId: string, status: TaskStatus) => {
     const updated = get().tasks.map((t) =>
       t.id === taskId ? { ...t, status } : t,
     );
     set({ tasks: updated });
   },
-
   clearError: () => set({ error: null }),
-
   reset: () =>
     set({
       tasks: [],

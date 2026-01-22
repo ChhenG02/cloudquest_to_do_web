@@ -5,14 +5,13 @@ export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 // Your UI Task (used by TaskItem/TaskList right now)
 export interface Task {
   id: string;
-  content: string;          // UI uses "content"
+  name: string;      
   status: TaskStatus;
-  // optional fields used in UI components:
   description?: string;
   deadline?: string;
   assignedTo: string[];
   userId?: string;
-  createdAt?: string;
+  updatedAt?: string;
 }
 
 // API task
