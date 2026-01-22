@@ -4,6 +4,7 @@ import TaskList from "./TaskList";
 import TaskModal from "./TaskModal";
 import MemberModal from "./MemberModal";
 import ConfirmModal from "./ConfirmModal";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuthStore } from "../stores/useAuthStore";
 import { useBoardStore } from "../stores/useBoardStore";
@@ -55,6 +56,8 @@ const Dashboard: React.FC = () => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [newTaskContent, setNewTaskContent] = useState("");
+  const { boardId } = useParams();
+  const navigate = useNavigate();
 
   const handleReorderSameColumn = async (
     status: TaskStatus,
@@ -103,16 +106,30 @@ const Dashboard: React.FC = () => {
   const completionRate =
     totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
+  useEffect(() => {
+    if (!currentUser?.id) return; 
+    if (!boardId) return;
+
+    setActiveBoardId(boardId);
+  }, [currentUser?.id, boardId, setActiveBoardId]);
+
   // 1) Fetch boards once logged in
   useEffect(() => {
     if (!currentUser?.id) return;
+    fetchBoards();   
+    if (boardId) return;
+    if (!boards.length) return;
 
-    // clear old account UI immediately, then refetch
-    useBoardStore.getState().reset();
-    useTaskStore.getState().reset();
-
-    fetchBoards();
-  }, [currentUser?.id]);
+    const id = activeBoardId || boards[0].id;
+    navigate(`/dashboard/${id}`, { replace: true });
+  }, [
+    currentUser?.id,
+    boardId,
+    boards.length,
+    activeBoardId,
+    boards,
+    navigate,
+  ]);
 
   // 2) Fetch tasks for active board
   useEffect(() => {
