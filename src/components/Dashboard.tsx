@@ -170,7 +170,11 @@ const Dashboard: React.FC = () => {
     setShowBoardMenu(false);
   };
 
-  const { createTask } = useTaskStore();
+  const {
+    createTask,
+    updateTask: updateTaskInStore,
+    deleteTask: deleteTaskInStore,
+  } = useTaskStore();
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskContent.trim() || !canModify) return;
@@ -187,31 +191,43 @@ const Dashboard: React.FC = () => {
 
   // Keep same updateTask behavior (for modal update)
   const updateTask = async (id: string, updates: Partial<Task>) => {
-    // ✅ status: call backend
-    if (updates.status) {
-      await updateTaskStatus(id, updates.status);
-    }
+    try {
+      console.log("Updating task:", id, updates);
 
-    // ✅ other fields still local (until you create backend endpoints)
-    if (
-      updates.content ||
-      updates.description ||
-      updates.deadline ||
-      updates.assignedTo
-    ) {
-      const next = tasks.map((t) => (t.id === id ? { ...t, ...updates } : t));
-      useTaskStore.getState().setTasks(next);
-    }
+      // If status update, use updateTaskStatus
+      if (updates.status) {
+        await updateTaskStatus(id, updates.status);
+      }
 
-    if (selectedTask?.id === id)
-      setSelectedTask({ ...selectedTask, ...updates });
+      // If other fields, use the new updateTask method
+      if (
+        updates.name ||
+        updates.description ||
+        updates.deadline ||
+        updates.assignedTo
+      ) {
+        await updateTaskInStore(id, updates);
+      }
+
+      if (selectedTask?.id === id) {
+        setSelectedTask({ ...selectedTask, ...updates });
+      }
+
+      return true; // Success
+    } catch (error: any) {
+      console.error("Failed to update task:", error);
+      toast.error(error.message || "Failed to update task");
+      throw error; // Re-throw to be caught by TaskModal
+    }
   };
 
-  const deleteTask = (task: Task) => {
-    // local-only delete
-    useTaskStore.getState().setTasks(tasks.filter((t) => t.id !== task.id));
-    setConfirmTaskDelete(null);
-    toast.success("Task deleted (local)");
+  const deleteTask = async (task: Task) => {
+    try {
+      await deleteTaskInStore(task.id);
+      setConfirmTaskDelete(null);
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+    }
   };
 
   const startRename = () => {
@@ -404,7 +420,7 @@ const Dashboard: React.FC = () => {
             <form onSubmit={handleAddTask} className="flex max-w-lg gap-2">
               <input
                 type="text"
-                placeholder="Draft a new task..."
+                placeholder="Add a new task ..."
                 value={newTaskContent}
                 onChange={(e) => setNewTaskContent(e.target.value)}
                 className="flex-grow text-xs px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all shadow-sm"
@@ -535,7 +551,7 @@ const Dashboard: React.FC = () => {
       {confirmTaskDelete && (
         <ConfirmModal
           title="Delete Task"
-          message={`Are you sure you want to permanently delete the task "${confirmTaskDelete.content}"?`}
+          message={`Are you sure you want to permanently delete the task "${confirmTaskDelete.name}"?`} // Changed from content to name
           onConfirm={() => deleteTask(confirmTaskDelete)}
           onCancel={() => setConfirmTaskDelete(null)}
         />

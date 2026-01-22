@@ -46,7 +46,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
     >
       <div className="flex justify-between items-start gap-2 mb-3">
         <p className="text-sm text-gray-700 leading-tight break-words pr-6 font-medium">
-          {task.content}
+          {task.name}
         </p>
 
         {canModify && (
