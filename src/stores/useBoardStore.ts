@@ -20,6 +20,7 @@ interface BoardState {
   isLoading: boolean;
   error: string | null;
 
+  createBoard: (name: string) => Promise<Board>;
   fetchBoards: () => Promise<void>;
   setActiveBoardId: (boardId: string) => void;
 
@@ -43,6 +44,33 @@ export const useBoardStore = create<BoardState>()(
 
       isLoading: false,
       error: null,
+
+      createBoard: async (name: string) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          const res = await axiosInstance.post("boards", { name });
+          const created: Board = res.data;
+
+  
+          set({
+            boards: [...get().boards, created],
+
+            activeBoardId: created.id,
+            isLoading: false,
+          });
+
+          localStorage.setItem(ACTIVE_BOARD_KEY, created.id);
+          toast.success("Board created");
+          return created;
+        } catch (error: any) {
+          const errorMessage =
+            error?.response?.data?.message || "Failed to create board";
+          set({ error: errorMessage, isLoading: false });
+          toast.error(errorMessage);
+          throw error;
+        }
+      },
 
       fetchBoards: async () => {
         set({ isLoading: true, error: null });
@@ -86,7 +114,7 @@ export const useBoardStore = create<BoardState>()(
         set({ isLoading: true, error: null });
 
         try {
-          await axiosInstance.put(`boards/${boardId}`, { name });
+          await axiosInstance.patch(`boards/${boardId}`, { name });
 
           const updatedBoards = get().boards.map((b) =>
             b.id === boardId ? { ...b, name } : b,
