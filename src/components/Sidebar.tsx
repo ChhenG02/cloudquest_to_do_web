@@ -6,8 +6,13 @@ import { useNavigate } from "react-router-dom";
 
 const Sidebar: React.FC = () => {
   const { logout, user } = useAuthStore();
-  const { boards, activeBoardId, setActiveBoardId, createBoard, isLoading } =
-    useBoardStore();
+  const {
+    boards,
+    activeBoardId,
+    setActiveBoardId,
+    createBoard,
+    isCreatingBoard,
+  } = useBoardStore();
 
   const currentUser = user || {
     id: "",
@@ -113,7 +118,7 @@ const Sidebar: React.FC = () => {
 
       {isCreateOpen && (
         <CreateBoardModal
-          isSubmitting={isLoading}
+          isSubmitting={isCreatingBoard}
           onCancel={() => setIsCreateOpen(false)}
           onCreate={async (name) => {
             const created = await createBoard(name);
