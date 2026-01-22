@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useBoardStore } from "../stores/useBoardStore";
 import CreateBoardModal from "../components/CreateBoardModal";
+import { useNavigate } from "react-router-dom";
 
 const Sidebar: React.FC = () => {
   const { logout, user } = useAuthStore();
@@ -16,6 +17,7 @@ const Sidebar: React.FC = () => {
   };
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="w-64 bg-gray-900 text-gray-300 flex flex-col h-full border-r border-gray-800">
@@ -50,7 +52,10 @@ const Sidebar: React.FC = () => {
           {boards.map((board) => (
             <div
               key={board.id}
-              onClick={() => setActiveBoardId(board.id)}
+              onClick={() => {
+                setActiveBoardId(board.id);
+                navigate(`/dashboard/${board.id}`);
+              }}
               className={`group flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer ${
                 activeBoardId === board.id
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
@@ -111,8 +116,9 @@ const Sidebar: React.FC = () => {
           isSubmitting={isLoading}
           onCancel={() => setIsCreateOpen(false)}
           onCreate={async (name) => {
-            await createBoard(name);
+            const created = await createBoard(name);
             setIsCreateOpen(false);
+            navigate(`/dashboard/${created.id}`);
           }}
         />
       )}
