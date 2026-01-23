@@ -80,7 +80,7 @@ const Sidebar: React.FC = () => {
                 <span className="truncate block font-medium">{board.name}</span>
               </div>
 
-              {board.type === "group" && (
+              {board.type === "team" && (
                 <span className="text-[10px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded ml-2 flex-shrink-0">
                   Team
                 </span>

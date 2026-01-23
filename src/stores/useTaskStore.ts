@@ -143,7 +143,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       );
 
       set({ tasks: next, isLoading: false });
-      toast.success("Task updated");
       return updatedUiTask;
     } catch (error: any) {
       const errorMessage =

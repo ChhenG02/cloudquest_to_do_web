@@ -31,6 +31,7 @@ const Dashboard: React.FC = () => {
     getActiveBoard,
     renameBoard,
     deleteBoard,
+    fetchBoardMembers,
   } = useBoardStore();
 
   const {
@@ -112,6 +113,11 @@ const Dashboard: React.FC = () => {
 
     setActiveBoardId(boardId);
   }, [currentUser?.id, boardId, setActiveBoardId]);
+
+  useEffect(() => {
+    if (!activeBoardId) return;
+    fetchBoardMembers(activeBoardId).catch(() => {});
+  }, [activeBoardId, fetchBoardMembers]);
 
   // 1) Fetch boards once logged in
   useEffect(() => {
@@ -281,28 +287,41 @@ const Dashboard: React.FC = () => {
                 </form>
               ) : (
                 <button
-                  onClick={() => setShowBoardMenu(!showBoardMenu)}
-                  className="flex items-center gap-2 hover:bg-gray-100 px-3 py-1 -ml-3 rounded-lg transition-colors group"
+                  onClick={() => {
+                    if (!isOwner) return;
+                    setShowBoardMenu(!showBoardMenu);
+                  }}
+                  disabled={!isOwner}
+                  className={`flex items-center gap-2 px-3 py-1 -ml-3 rounded-lg transition-colors group ${
+                    isOwner ? "hover:bg-gray-100" : "opacity-6"
+                  }`}
+                  title={
+                    !isOwner
+                      ? "Only the owner can open board settings"
+                      : "Board Settings"
+                  }
                 >
                   <h1 className="text-xl font-bold text-gray-900">
                     {activeBoard?.name ||
                       (boards.length ? "Loading..." : "No boards")}
                   </h1>
-                  <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform ${
-                      showBoardMenu ? "rotate-180" : ""
-                    }`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                  {isOwner && (
+                    <svg
+                      className={`w-4 h-4 text-gray-400 transition-transform ${
+                        showBoardMenu ? "rotate-180" : ""
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  )}
                 </button>
               )}
 
@@ -335,18 +354,6 @@ const Dashboard: React.FC = () => {
                       Rename Board
                     </button>
                   )}
-                  {/* 
-                   {showMemberModal && activeBoard && (
-        <MemberModal 
-          board={activeBoard} 
-          onClose={() => setShowMemberModal(false)} 
-          onUpdateBoard={(updates) => {
-             const updated = boards.map(b => b.id === activeBoardId ? { ...b, ...updates } : b);
-             persist(updated, tasks);
-          }} 
-          currentUserId={currentUser.id}
-        />
-      )} */}
 
                   {isOwner && (
                     <button
@@ -405,15 +412,29 @@ const Dashboard: React.FC = () => {
 
             {/* member avatars like old */}
             <div className="flex -space-x-1.5 ml-2">
-              {members.map((m) => (
-                <div
-                  key={m.userId}
-                  className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700 hover:z-10 cursor-help transition-all"
-                  title={`${m.name} (${m.role})`}
-                >
-                  {m.name[0]}
-                </div>
-              ))}
+              {members.map((m) => {
+                const isMemberOwner =
+                  m.role === "OWNER" || m.userId === activeBoard?.ownerId;
+
+                const displayName = isMemberOwner
+                  ? currentUser?.username ||
+                    currentUser?.name ||
+                    currentUser?.email ||
+                    m.userId
+                  : m.name || m.email || m.userId;
+
+                const initial = (displayName?.[0] || "?").toUpperCase();
+
+                return (
+                  <div
+                    key={m.userId}
+                    className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700 hover:z-10 cursor-help transition-all"
+                    title={`${displayName} (${m.role})`}
+                  >
+                    {initial}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -551,17 +572,6 @@ const Dashboard: React.FC = () => {
         <MemberModal
           board={activeBoard}
           onClose={() => setShowMemberModal(false)}
-          onUpdateBoard={(updates) => {
-            // Local-only update for now:
-            // If you have endpoint, tell me and I'll connect it.
-            const nextBoards = boards.map((b) =>
-              b.id === activeBoard.id ? { ...b, ...updates } : b,
-            );
-            // You need a setter action in board store if you want to persist locally:
-            // easiest: re-fetch boards after saving on backend.
-            toast.success("Updated (local)");
-            useBoardStore.setState({ boards: nextBoards } as any);
-          }}
           currentUserId={currentUser.id}
         />
       )}
