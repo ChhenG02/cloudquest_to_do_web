@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
     totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
   useEffect(() => {
-    if (!currentUser?.id) return; 
+    if (!currentUser?.id) return;
     if (!boardId) return;
 
     setActiveBoardId(boardId);
@@ -116,7 +116,7 @@ const Dashboard: React.FC = () => {
   // 1) Fetch boards once logged in
   useEffect(() => {
     if (!currentUser?.id) return;
-    fetchBoards();   
+    fetchBoards();
     if (boardId) return;
     if (!boards.length) return;
 
@@ -179,6 +179,8 @@ const Dashboard: React.FC = () => {
   const handleDeleteBoard = async (board: Board) => {
     try {
       await deleteBoard(board.id);
+      // Reset task store after board deletion
+      useTaskStore.getState().reset();
     } catch {
       // toast already shown in store
     }

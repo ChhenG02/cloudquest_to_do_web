@@ -3,6 +3,7 @@ import { useAuthStore } from "../stores/useAuthStore";
 import { useBoardStore } from "../stores/useBoardStore";
 import CreateBoardModal from "../components/CreateBoardModal";
 import { useNavigate } from "react-router-dom";
+import ConfirmModal from "./ConfirmModal";
 
 const Sidebar: React.FC = () => {
   const { logout, user } = useAuthStore();
@@ -22,6 +23,7 @@ const Sidebar: React.FC = () => {
   };
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -96,7 +98,7 @@ const Sidebar: React.FC = () => {
 
       <div className="mt-auto p-4 border-t border-gray-800 bg-gray-900/50">
         <button
-          onClick={logout}
+          onClick={() => setConfirmSignOut(true)}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-red-900/10 hover:bg-red-900/30 text-red-400 rounded-lg text-xs font-bold transition-all border border-red-500/10 hover:border-red-500/30 shadow-sm"
         >
           <svg
@@ -124,6 +126,20 @@ const Sidebar: React.FC = () => {
             const created = await createBoard(name);
             setIsCreateOpen(false);
             navigate(`/dashboard/${created.id}`);
+          }}
+        />
+      )}
+
+      {confirmSignOut && (
+        <ConfirmModal
+          title="Sign out?"
+          message="Are you sure you want to sign out?"
+          confirmLabel="Sign out"
+          confirmVariant="danger"
+          onCancel={() => setConfirmSignOut(false)}
+          onConfirm={() => {
+            setConfirmSignOut(false);
+            logout();
           }}
         />
       )}
