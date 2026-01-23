@@ -26,13 +26,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
       const d = new Date(task.deadline);
       // Format date: YYYY-MM-DD
       const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
       setDeadlineDate(`${year}-${month}-${day}`);
-      
+
       // Format time: HH:MM (24-hour format)
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, "0");
+      const minutes = String(d.getMinutes()).padStart(2, "0");
       setDeadlineTime(`${hours}:${minutes}`);
     } else {
       setDeadlineDate("");
@@ -42,15 +42,15 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   const formatTimeForDisplay = (time24h: string) => {
     if (!time24h) return "";
-    const [hours, minutes] = time24h.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
+    const [hours, minutes] = time24h.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
     const hours12 = hours % 12 || 12;
-    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+    return `${hours12}:${minutes.toString().padStart(2, "0")} ${period}`;
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    
+
     try {
       const updates: Partial<Task> = {};
 
@@ -125,7 +125,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
               </span>
               <span>•</span>
               <span>
-                {task.updatedAt ? new Date(task.updatedAt).toLocaleDateString() : "Unknown date"}
+                {task.updatedAt
+                  ? new Date(task.updatedAt).toLocaleDateString()
+                  : "Unknown date"}
               </span>
             </div>
           </div>
@@ -184,24 +186,32 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 Assigned Members
               </h4>
               <div className="flex flex-wrap gap-2">
-                {members.map((member) => (
-                  <button
-                    key={member.userId}
-                    onClick={() => toggleMember(member.userId)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shadow-sm ${
-                      task.assignedTo.includes(member.userId)
-                        ? "bg-blue-600 text-white border-blue-600 scale-105 ring-2 ring-blue-100"
-                        : "bg-white text-gray-500 border-gray-200 hover:border-blue-400"
-                    }`}
-                    title={member.name}
-                  >
-                    {member.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()}
-                  </button>
-                ))}
+                {members.map((member) => {
+                  const label =
+                    member.name || member.email || member.userId || "User";
+                  const initials = label
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase();
+
+                  return (
+                    <button
+                      key={member.userId}
+                      onClick={() => toggleMember(member.userId)}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shadow-sm ${
+                        task.assignedTo.includes(member.userId)
+                          ? "bg-blue-600 text-white border-blue-600 scale-105 ring-2 ring-blue-100"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-blue-400"
+                      }`}
+                      title={label}
+                    >
+                      {initials}
+                    </button>
+                  );
+                })}
               </div>
             </section>
 
@@ -221,7 +231,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     className="w-full p-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all cursor-pointer shadow-sm hover:border-blue-400"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-400 font-medium mb-1">
                     Time
@@ -233,10 +243,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       onChange={(e) => setDeadlineTime(e.target.value)}
                       className="flex-grow p-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all cursor-pointer shadow-sm hover:border-blue-400"
                     />
-                 
                   </div>
                 </div>
-          
               </div>
             </section>
           </div>

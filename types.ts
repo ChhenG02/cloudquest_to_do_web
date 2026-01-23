@@ -29,7 +29,7 @@ export interface Board {
   ownerId: string;
 
   // Optional fields your old UI referenced; safe to keep optional
-  type?: 'personal' | 'group';
+  type?: 'personal' | 'team';
   members?: BoardMember[];
 }
 
