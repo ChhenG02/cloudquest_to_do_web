@@ -108,7 +108,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const uiTask = mapApiTaskToUiTask(apiTask);
 
       set({ tasks: [uiTask, ...get().tasks], isLoading: false });
-      toast.success("Task created");
       return uiTask;
     } catch (error: any) {
       const errorMessage =
