@@ -20,12 +20,15 @@ const TaskItem: React.FC<TaskItemProps> = ({
   members,
   canModify,
 }) => {
+  const assignedToSafe = Array.isArray(task.assignedTo) ? task.assignedTo : [];
   const assignedMembers = members.filter((m) =>
-    task.assignedTo.includes(m.userId),
+    assignedToSafe.includes(m.userId),
   );
 
   const isOverdue =
-    task.deadline && new Date(task.deadline) < new Date() && task.status !== DONE;
+    task.deadline &&
+    new Date(task.deadline) < new Date() &&
+    task.status !== DONE;
 
   return (
     <div
@@ -81,7 +84,9 @@ const TaskItem: React.FC<TaskItemProps> = ({
           {task.deadline && (
             <div
               className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                isOverdue ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500"
+                isOverdue
+                  ? "bg-red-100 text-red-600"
+                  : "bg-gray-100 text-gray-500"
               }`}
             >
               <svg
@@ -122,15 +127,20 @@ const TaskItem: React.FC<TaskItemProps> = ({
         </div>
 
         <div className="flex -space-x-1.5">
-          {assignedMembers.map((m) => (
-            <div
-              key={m.userId}
-              className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center text-[8px] font-bold text-blue-600"
-              title={m.name}
-            >
-              {m.name[0]}
-            </div>
-          ))}
+          {assignedMembers.map((m) => {
+            const label = (m.name || m.email || m.userId || "U").trim();
+            const initial = (label[0] || "U").toUpperCase();
+
+            return (
+              <div
+                key={m.userId}
+                className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center text-[8px] font-bold text-blue-600"
+                title={label}
+              >
+                {initial}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

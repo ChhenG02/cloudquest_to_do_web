@@ -416,12 +416,9 @@ const Dashboard: React.FC = () => {
                 const isMemberOwner =
                   m.role === "OWNER" || m.userId === activeBoard?.ownerId;
 
-                const displayName = isMemberOwner
-                  ? currentUser?.username ||
-                    currentUser?.name ||
-                    currentUser?.email ||
-                    m.userId
-                  : m.name || m.email || m.userId;
+                const isMe = m.userId === currentUser?.id;
+
+                const displayName = isMe ? "Me" : m.name || m.email || m.userId;
 
                 const initial = (displayName?.[0] || "?").toUpperCase();
 
@@ -490,7 +487,9 @@ const Dashboard: React.FC = () => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
               }}
-              onTaskClick={setSelectedTask}
+              onTaskClick={(t) => {
+                setSelectedTask(t);
+              }}
               targetStatus={STATUS.TODO}
               members={members}
               canModify={canModify}
@@ -507,7 +506,10 @@ const Dashboard: React.FC = () => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
               }}
-              onTaskClick={setSelectedTask}
+              onTaskClick={(t) => {
+                if (!canModify) return; // VIEWER can’t open edit modal
+                setSelectedTask(t);
+              }}
               targetStatus={STATUS.IN_PROGRESS}
               members={members}
               canModify={canModify}
@@ -524,7 +526,10 @@ const Dashboard: React.FC = () => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
               }}
-              onTaskClick={setSelectedTask}
+              onTaskClick={(t) => {
+                if (!canModify) return; // VIEWER can’t open edit modal
+                setSelectedTask(t);
+              }}
               targetStatus={STATUS.DONE}
               members={members}
               canModify={canModify}
@@ -564,6 +569,7 @@ const Dashboard: React.FC = () => {
           onClose={() => setSelectedTask(null)}
           onUpdate={(updates) => updateTask(selectedTask.id, updates)}
           members={members}
+          canModify={canModify}
         />
       )}
 

@@ -35,6 +35,8 @@ interface TaskState {
   fetchTasksByBoard: (boardId: string) => Promise<void>;
   createTask: (boardId: string, name: string) => Promise<Task>;
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<Task>;
+  fetchTaskAssignees: (taskId: string) => Promise<string[]>;
+  setTaskAssignees: (taskId: string, userIds: string[]) => Promise<string[]>;
   updateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   reorderColumn: (
@@ -83,6 +85,22 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const tasks = apiTasks.map(mapApiTaskToUiTask);
 
       set({ tasks, isLoading: false });
+      await Promise.all(
+        tasks.map(async (t) => {
+          try {
+            const res = await axiosInstance.get(`tasks/${t.id}/assignees`);
+            const ids = (res.data || []).map((a: any) => a.userId) as string[];
+
+            set((state) => ({
+              tasks: state.tasks.map((x) =>
+                x.id === t.id ? { ...x, assignedTo: ids } : x,
+              ),
+            }));
+          } catch {
+            // ignore assignee fetch per-task if it fails
+          }
+        }),
+      );
     } catch (error: any) {
       const errorMessage =
         error?.response?.data?.message || "Failed to fetch tasks";
@@ -119,39 +137,52 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   updateTask: async (taskId: string, updates: Partial<Task>) => {
-    set({ isLoading: true, error: null });
+  set({ isLoading: true, error: null });
 
-    try {
-      // Prepare payload for API
-      const payload: any = {};
-      if (updates.name !== undefined) payload.name = updates.name;
-      if (updates.description !== undefined)
-        payload.description = updates.description;
-      if (updates.deadline !== undefined) payload.deadline = updates.deadline;
-      if (updates.assignedTo !== undefined)
-        payload.assignedTo = updates.assignedTo;
+  try {
+    // Prepare payload for API - now includes assignedTo
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.description !== undefined)
+      payload.description = updates.description;
+    if (updates.deadline !== undefined) payload.deadline = updates.deadline;
+    if (updates.assignedTo !== undefined) payload.assignedTo = updates.assignedTo;
 
-      console.log("Sending update payload:", payload);
+    console.log("Sending update payload:", payload);
 
-      const res = await axiosInstance.patch(`tasks/${taskId}`, payload);
-      const updatedApiTask: ApiTask = res.data;
-      const updatedUiTask = mapApiTaskToUiTask(updatedApiTask);
+    const res = await axiosInstance.patch(`tasks/${taskId}`, payload);
+    const updatedApiTask: ApiTask = res.data;
+    
+    // Get current task to preserve assignees if not in response
+    const currentTask = get().tasks.find(t => t.id === taskId);
+    
+    // Create updated task, preserving assignedTo from current task if not in API response
+    const updatedUiTask: Task = {
+      id: updatedApiTask.id,
+      name: updatedApiTask.name,
+      status: updatedApiTask.status,
+      assignedTo: updatedApiTask.assignedTo || currentTask?.assignedTo || [],
+      description: updatedApiTask.description,
+      deadline: updatedApiTask.deadline,
+      boardId: updatedApiTask.boardId,
+      updatedAt: updatedApiTask.updatedAt,
+    };
 
-      // Update local state
-      const next = get().tasks.map((t) =>
-        t.id === taskId ? { ...t, ...updatedUiTask } : t,
-      );
+    // Update local state
+    const next = get().tasks.map((t) =>
+      t.id === taskId ? { ...t, ...updatedUiTask } : t,
+    );
 
-      set({ tasks: next, isLoading: false });
-      return updatedUiTask;
-    } catch (error: any) {
-      const errorMessage =
-        error?.response?.data?.message || "Failed to update task";
-      set({ error: errorMessage, isLoading: false });
-      toast.error(errorMessage);
-      throw error; // Important: re-throw the error
-    }
-  },
+    set({ tasks: next, isLoading: false });
+    return updatedUiTask;
+  } catch (error: any) {
+    const errorMessage =
+      error?.response?.data?.message || "Failed to update task";
+    set({ error: errorMessage, isLoading: false });
+    toast.error(errorMessage);
+    throw error;
+  }
+},
 
   updateTaskStatus: async (taskId: string, status: TaskStatus) => {
     set({ isLoading: true, error: null });
@@ -186,6 +217,47 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         error?.response?.data?.message || "Failed to delete task";
       set({ error: errorMessage, isLoading: false });
       toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  fetchTaskAssignees: async (taskId: string) => {
+    try {
+      const res = await axiosInstance.get(`tasks/${taskId}/assignees`);
+      const assignees: { userId: string }[] = res.data || [];
+      const userIds = assignees.map((a) => a.userId);
+
+      // update task in store
+      set({
+        tasks: get().tasks.map((t) =>
+          t.id === taskId ? { ...t, assignedTo: userIds } : t,
+        ),
+      });
+
+      return userIds;
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || "Failed to load assignees";
+      toast.error(msg);
+      throw error;
+    }
+  },
+
+  setTaskAssignees: async (taskId: string, userIds: string[]) => {
+    try {
+      await axiosInstance.patch(`tasks/${taskId}/assignees`, { userIds });
+
+      // update immediately in UI
+      set({
+        tasks: get().tasks.map((t) =>
+          t.id === taskId ? { ...t, assignedTo: userIds } : t,
+        ),
+      });
+
+      return userIds;
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message || "Failed to update assignees";
+      toast.error(msg);
       throw error;
     }
   },
