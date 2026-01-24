@@ -1,11 +1,13 @@
 import { BoardMember, Task } from "@/types";
 import React, { useState, useEffect } from "react";
+import { useTaskStore } from "../stores/useTaskStore";
 
 interface TaskModalProps {
   task: Task;
   onClose: () => void;
   onUpdate: (updates: Partial<Task>) => void;
   members: BoardMember[];
+  canModify: boolean;
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({
@@ -13,12 +15,20 @@ const TaskModal: React.FC<TaskModalProps> = ({
   onClose,
   onUpdate,
   members,
+  canModify,
 }) => {
   const [name, setName] = useState(task.name || "");
   const [description, setDescription] = useState(task.description || "");
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const { setTaskAssignees } = useTaskStore();
+
+  const [assignedTo, setAssignedTo] = useState<string[]>(task.assignedTo || []);
+
+  useEffect(() => {
+    setAssignedTo(task.assignedTo || []);
+  }, [task.id, task.assignedTo]);
 
   // Initialize deadline with proper format
   useEffect(() => {
@@ -78,9 +88,20 @@ const TaskModal: React.FC<TaskModalProps> = ({
         updates.deadline = null;
       }
 
+      const prev = Array.isArray(task.assignedTo) ? task.assignedTo : [];
+      const next = assignedTo;
+
+      const same =
+        prev.length === next.length && prev.every((id) => next.includes(id));
+
       // Only call onUpdate if there are actual changes
       if (Object.keys(updates).length > 0) {
         await onUpdate(updates);
+      }
+
+      // Handle assignees separately if changed
+      if (!same) {
+        await setTaskAssignees(task.id, next);
       }
 
       // Always close the modal
@@ -94,10 +115,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   const toggleMember = (userId: string) => {
-    const newAssigned = task.assignedTo.includes(userId)
-      ? task.assignedTo.filter((id) => id !== userId)
-      : [...task.assignedTo, userId];
-    onUpdate({ assignedTo: newAssigned });
+    setAssignedTo((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId],
+    );
   };
 
   return (
@@ -113,6 +135,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              readOnly={!canModify}
+              disabled={!canModify}
               className="text-xl font-bold text-gray-900 mb-1 leading-tight w-full bg-transparent border-none outline-none"
               placeholder="Task name"
             />
@@ -174,6 +198,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                readOnly={!canModify}
+                disabled={!canModify}
                 placeholder="Add a more detailed description..."
                 className="w-full min-h-[160px] p-4 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all resize-none shadow-inner"
               ></textarea>
@@ -201,8 +227,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     <button
                       key={member.userId}
                       onClick={() => toggleMember(member.userId)}
+                      disabled={!canModify}
                       className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shadow-sm ${
-                        task.assignedTo.includes(member.userId)
+                        assignedTo.includes(member.userId)
                           ? "bg-blue-600 text-white border-blue-600 scale-105 ring-2 ring-blue-100"
                           : "bg-white text-gray-500 border-gray-200 hover:border-blue-400"
                       }`}
@@ -228,6 +255,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     type="date"
                     value={deadlineDate}
                     onChange={(e) => setDeadlineDate(e.target.value)}
+                    readOnly={!canModify}
+                    disabled={!canModify}
                     className="w-full p-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all cursor-pointer shadow-sm hover:border-blue-400"
                   />
                 </div>
@@ -241,6 +270,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       type="time"
                       value={deadlineTime}
                       onChange={(e) => setDeadlineTime(e.target.value)}
+                      readOnly={!canModify}
+                      disabled={!canModify}
                       className="flex-grow p-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all cursor-pointer shadow-sm hover:border-blue-400"
                     />
                   </div>
@@ -258,24 +289,26 @@ const TaskModal: React.FC<TaskModalProps> = ({
           >
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className={`px-8 py-2.5 text-white rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95 ${
-              isSaving
-                ? "bg-blue-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 shadow-blue-600/20"
-            }`}
-          >
-            {isSaving ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Saving...
-              </div>
-            ) : (
-              "Save Details"
-            )}
-          </button>
+          {canModify && (
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`px-8 py-2.5 text-white rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95 ${
+                isSaving
+                  ? "bg-blue-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 shadow-blue-600/20"
+              }`}
+            >
+              {isSaving ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </div>
+              ) : (
+                "Save Details"
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
