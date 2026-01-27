@@ -482,7 +482,6 @@ const Dashboard: React.FC = () => {
                 await updateTaskStatus(id, status);
                 if (activeBoardId) await fetchTasksByBoard(activeBoardId);
               }}
-              onReorderSameColumn={handleReorderSameColumn}
               onDelete={(id) => {
                 const t = tasks.find((task) => task.id === id);
                 if (t) setConfirmTaskDelete(t);
@@ -507,7 +506,7 @@ const Dashboard: React.FC = () => {
                 if (t) setConfirmTaskDelete(t);
               }}
               onTaskClick={(t) => {
-                if (!canModify) return; // VIEWER can’t open edit modal
+                if (!canModify) return;
                 setSelectedTask(t);
               }}
               targetStatus={STATUS.IN_PROGRESS}
