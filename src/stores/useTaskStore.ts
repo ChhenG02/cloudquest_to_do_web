@@ -102,12 +102,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }),
       );
     } catch (error: any) {
-      const errorMessage =
-        error?.response?.data?.message || "Failed to fetch tasks";
-      set({ error: errorMessage, isLoading: false });
-      toast.error(errorMessage);
-      throw error;
-    }
+  const status = error?.response?.status;
+  const errorMessage =
+    error?.response?.data?.message || 'Failed to fetch tasks';
+
+  if (status === 403) {
+    set({
+      tasks: [],
+      boardId: null,
+      isLoading: false,
+      error: null,
+    });
+    return; 
+  }
+
+  set({ error: errorMessage, isLoading: false });
+  toast.error(errorMessage);
+}
+
   },
 
   createTask: async (boardId: string, name: string) => {
